@@ -1,0 +1,17 @@
+[Unit]
+Description=iCal Alarmos Webservice
+After=network.target
+
+[Service]
+Type=simple
+User=ical
+WorkingDirectory=/opt/ical-alarmos
+Environment=CONFIG_PATH=/opt/ical-alarmos/config.yaml
+# Falls das Secret nicht in config.yaml liegen soll, hier stattdessen setzen:
+# Environment=ICAL_URL=https://...
+ExecStart=/opt/ical-alarmos/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8081
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

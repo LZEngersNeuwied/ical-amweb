@@ -1,0 +1,35 @@
+# Konfiguration für den iCal-Alarmos-Webservice
+#
+# Achtung: "ical.url" enthält ein personenbezogenes JWT-Token (Zugangsschlüssel
+# zum Feuernetz-Kalender). Diese Datei sollte NICHT öffentlich einsehbar sein
+# bzw. nicht ungeschützt in ein Git-Repo wandern.
+# Alternativ kann die URL zur Laufzeit per Umgebungsvariable ICAL_URL
+# überschrieben werden, ohne diese Datei anzufassen (z.B. für Secrets-Manager,
+# systemd EnvironmentFile o.ä.).
+
+service:
+  host: "0.0.0.0"
+  port: 8081
+  # Erlaubte Origins für CORS-Header. "*" erlaubt alle Domains.
+  cors_allow_origins:
+    - "*"
+
+ical:
+  url: ""
+  # Timeout für den HTTP-Request zum ICS-Feed
+  timeout_seconds: 10
+  # Anzahl zusätzlicher Versuche bei Fehlern (0 = kein Retry)
+  fetch_retries: 2
+  retry_delay_seconds: 2
+  # Zeitfenster: wie viele Wochen ab heute (00:00 Uhr) angezeigt werden sollen
+  weeks_ahead: 8
+
+logging:
+  level: "INFO"
+
+# Muss zu static/style.css passen (.event min-height / .calendar gap).
+# Wird genutzt, um bei Angabe von ?height_px=... nur vollständige
+# Termin-Boxen anzuzeigen und den Rest abzuschneiden.
+layout:
+  event_height_px: 76
+  gap_px: 8

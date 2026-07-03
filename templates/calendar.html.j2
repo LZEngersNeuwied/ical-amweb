@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Einsatz-/Terminkalender</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="calendar">
+        {% if events %}
+            {% for e in events %}
+            <div class="event">
+                <div class="event-date">
+                    <div class="event-day">{{ e.day }}</div>
+                    <div class="event-month">{{ e.month }}</div>
+                </div>
+                <div class="event-details">
+                    <div class="event-title">{{ e.summary }}</div>
+                    <div class="event-time">{{ e.start }}&nbsp;Uhr - {{ e.end }}&nbsp;Uhr</div>
+                    {% if e.location %}
+                    <div class="event-location">{{ e.location }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">Keine Termine im gewählten Zeitraum.</div>
+        {% endif %}
+    </div>
+</body>
+</html>

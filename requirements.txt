@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+requests
+icalendar
+python-dateutil
+PyYAML
+jinja2
