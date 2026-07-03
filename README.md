@@ -1,4 +1,4 @@
-# iCal-AMWeb-Webservice
+# iCal-AMWeb-Webservice - Version 1.1 (Ausrücken)
 
 Ruft bei jedem Request live den Feuernetz-ICS-Kalender ab und liefert ihn als HTML-Seite aus. Der Client fragt den Webservice direkt ab.
 
