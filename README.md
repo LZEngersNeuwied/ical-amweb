@@ -1,6 +1,8 @@
 # iCal-AMWeb-Webservice
 
-Ruft bei jedem Request live den Feuernetz-ICS-Kalender ab und liefert ihn als HTML-Seite aus. Kein Caching — der Client fragt den Webservice direkt ab.
+Ruft bei jedem Request live den Feuernetz-ICS-Kalender ab und liefert ihn als HTML-Seite aus. Der Client fragt den Webservice direkt ab.
+
+Ist die Kalender-Quelle gerade nicht erreichbar (Timeout, Netzwerkfehler, HTTP-Fehler), liefert der Dienst automatisch den zuletzt erfolgreich abgerufenen Kalenderstand aus dem Cache aus, statt einen Fehler zu zeigen. Sobald ein neuer Abruf wieder gelingt, wird der Cache automatisch aktualisiert. Auf der Seite erscheint dann ein dezenter Hinweis mit Zeitstempel des angezeigten Standes; per Response-Header `X-Calendar-Cache: live|stale` lässt sich das auch maschinell auswerten. Liegt weder ein Live-Abruf noch ein Cache-Stand vor (z. B. direkt nach der Ersteinrichtung ohne Netzverbindung) oder kann der ICS-Feed nicht verarbeitet werden, liefert der Dienst weiterhin `200 OK` mit einer Hinweisseite ("Aktuell können keine Kalenderdaten angezeigt werden."), erkennbar am Header `X-Calendar-Cache: unavailable`.
 
 ## Setup (lokal / zum Testen)
 
@@ -40,6 +42,8 @@ Alle Einstellungen liegen in `config.yaml`:
 - `ical.timeout_seconds` / `fetch_retries` / `retry_delay_seconds` — Verhalten bei Abruf-Fehlern
 - `service.port` — Port des Webservice (Standard 8081)
 - `service.cors_allow_origins` — erlaubte Origins für CORS
+- `cache.enabled` — Cache-Fallback aktivieren/deaktivieren (Standard: an)
+- `cache.file_path` — Pfad zur Cache-Datei (Standard: `cache/last_calendar.json`, relativ zum Projektverzeichnis)
 
 Die ICS-URL (enthält ein personenbezogenes Token) kann alternativ per
 Umgebungsvariable überschrieben werden, ohne `config.yaml` anzufassen:

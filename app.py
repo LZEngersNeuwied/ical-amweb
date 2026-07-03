@@ -14,6 +14,7 @@ Start (Produktion):
     siehe calendar-webservice.service
 """
 
+import json
 import logging
 import os
 import time as systime
@@ -26,7 +27,7 @@ import yaml
 from dateutil import tz
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from icalendar import Calendar
@@ -80,6 +81,46 @@ jinja_env = Environment(
 template = jinja_env.get_template("calendar.html.j2")
 
 
+def get_cache_path() -> Optional[Path]:
+    cache_cfg = config.get("cache", {})
+    if not cache_cfg.get("enabled", True):
+        return None
+    raw_path = Path(cache_cfg.get("file_path", "cache/last_calendar.json"))
+    return raw_path if raw_path.is_absolute() else BASE_DIR / raw_path
+
+
+def save_cache(ics_text: str) -> None:
+    """Speichert den zuletzt erfolgreich abgerufenen ICS-Text atomar (tmp + rename)."""
+    cache_path = get_cache_path()
+    if cache_path is None:
+        return
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "fetched_at": datetime.now(tz.tzutc()).isoformat(),
+            "ics_text": ics_text,
+        }
+        tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+        tmp_path.write_text(json.dumps(payload), encoding="utf-8")
+        tmp_path.replace(cache_path)
+    except OSError:
+        logger.exception("Konnte Kalender-Cache nicht schreiben (%s)", cache_path)
+
+
+def load_cache() -> Optional[tuple[str, datetime]]:
+    """Lädt den zuletzt gecachten ICS-Text, falls vorhanden."""
+    cache_path = get_cache_path()
+    if cache_path is None or not cache_path.exists():
+        return None
+    try:
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        fetched_at = datetime.fromisoformat(payload["fetched_at"])
+        return payload["ics_text"], fetched_at
+    except (OSError, ValueError, KeyError):
+        logger.exception("Konnte Kalender-Cache nicht lesen (%s)", cache_path)
+        return None
+
+
 def fetch_ics_text() -> str:
     """Ruft den ICS-Feed ab, mit Timeout und konfigurierbaren Retries."""
     ical_cfg = config["ical"]
@@ -103,6 +144,31 @@ def fetch_ics_text() -> str:
                 systime.sleep(delay)
 
     raise last_error
+
+
+def get_ics_text() -> tuple[str, bool, Optional[datetime]]:
+    """
+    Liefert (ics_text, is_stale, as_of).
+
+    Gelingt der Live-Abruf, wird das Ergebnis zusätzlich gecacht und
+    (ics_text, False, None) zurückgegeben. Schlägt er fehl, wird versucht,
+    auf den zuletzt gecachten Stand auszuweichen: (ics_text, True, fetched_at).
+    Ist auch kein Cache vorhanden, wird der ursprüngliche Fehler weitergereicht.
+    """
+    try:
+        ics_text = fetch_ics_text()
+        save_cache(ics_text)
+        return ics_text, False, None
+    except requests.RequestException as exc:
+        cached = load_cache()
+        if cached is None:
+            raise
+        ics_text, fetched_at = cached
+        logger.warning(
+            "ICS-Quelle nicht erreichbar (%s) - liefere gecachten Stand vom %s aus",
+            exc, fetched_at.isoformat(),
+        )
+        return ics_text, True, fetched_at
 
 
 def parse_events(ics_text: str, weeks_ahead: int) -> list[dict]:
@@ -165,6 +231,17 @@ def limit_events_by_height(events: list[dict], height_px: Optional[int]) -> list
     max_events = (height_px + gap) // (event_height + gap)
     return events[: max(max_events, 0)]
 
+def render_unavailable(reason: str) -> Response:
+    """Rendert eine Hinweisseite statt eines rohen 502, wenn weder Live-Daten
+    noch ein Cache-Stand verfügbar sind (z.B. direkt nach Ersteinrichtung ohne
+    Netzverbindung, oder wenn der ICS-Feed nicht geparst werden kann)."""
+    html = template.render(events=[], is_stale=False, as_of=None, is_unavailable=True)
+    logger.error("Keine Kalenderdaten ausgeliefert: %s", reason)
+    response = Response(content=html, media_type="text/html; charset=utf-8", status_code=200)
+    response.headers["X-Calendar-Cache"] = "unavailable"
+    return response
+
+
 @app.get("/calendar.html", response_class=Response)
 def get_calendar(
     height_px: Optional[int] = Query(
@@ -175,22 +252,26 @@ def get_calendar(
     )
 ):
     try:
-        ics_text = fetch_ics_text()
+        ics_text, is_stale, as_of = get_ics_text()
     except requests.RequestException as exc:
-        logger.error("ICS-Quelle dauerhaft nicht erreichbar: %s", exc)
-        raise HTTPException(status_code=502, detail="Kalender-Quelle nicht erreichbar")
+        return render_unavailable(f"ICS-Quelle nicht erreichbar und kein Cache vorhanden: {exc}")
 
     try:
         events = parse_events(ics_text, config["ical"].get("weeks_ahead", 4))
-    except Exception:
-        logger.exception("Fehler beim Parsen des ICS-Feeds")
-        raise HTTPException(status_code=502, detail="Kalenderdaten konnten nicht verarbeitet werden")
+    except Exception as exc:
+        return render_unavailable(f"Fehler beim Parsen des ICS-Feeds: {exc}")
 
     events = limit_events_by_height(events, height_px)
 
-    html = template.render(events=events)
-    logger.info("Kalender ausgeliefert (%s Termine, height_px=%s)", len(events), height_px)
-    return Response(content=html, media_type="text/html; charset=utf-8")
+    local_as_of = as_of.astimezone(tz.tzlocal()) if as_of else None
+    html = template.render(events=events, is_stale=is_stale, as_of=local_as_of, is_unavailable=False)
+    logger.info(
+        "Kalender ausgeliefert (%s Termine, height_px=%s, stale=%s)",
+        len(events), height_px, is_stale,
+    )
+    response = Response(content=html, media_type="text/html; charset=utf-8")
+    response.headers["X-Calendar-Cache"] = "stale" if is_stale else "live"
+    return response
 
 
 if __name__ == "__main__":

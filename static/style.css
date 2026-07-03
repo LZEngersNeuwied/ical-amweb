@@ -89,6 +89,26 @@ html, body {
     color: #888;
 }
 
+.unavailable {
+    padding: 24px;
+    text-align: center;
+    color: #e0e0e0;
+    font-weight: 600;
+    background-color: #3a2a2a;
+    border-left: 4px solid #d9534f;
+    border-radius: 4px;
+    margin: 12px;
+}
+
+.stale-notice {
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #d9a441;
+    background-color: #2a2a2a;
+    border-top: 1px solid #3a3a3a;
+}
+
 @media only screen and (min-width: 2048px) {
     html, body { font-size: 140%; }
 }

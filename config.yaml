@@ -24,6 +24,14 @@ ical:
   # Zeitfenster: wie viele Wochen ab heute (00:00 Uhr) angezeigt werden sollen
   weeks_ahead: 8
 
+# Cache für den zuletzt erfolgreich abgerufenen ICS-Kalender. Ist die
+# Kalender-Quelle nicht erreichbar, wird stattdessen der letzte erfolgreiche
+# Abruf ausgeliefert, bis wieder frische Daten geholt werden können.
+cache:
+  enabled: true
+  # Pfad zur Cache-Datei (relativ zum Projektverzeichnis oder absolut)
+  file_path: "cache/last_calendar.json"
+
 logging:
   level: "INFO"
 

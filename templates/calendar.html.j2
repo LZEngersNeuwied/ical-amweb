@@ -23,9 +23,16 @@
                 </div>
             </div>
             {% endfor %}
+        {% elif is_unavailable %}
+            <div class="unavailable">Aktuell können keine Kalenderdaten angezeigt werden.</div>
         {% else %}
             <div class="empty">Keine Termine im gewählten Zeitraum.</div>
         {% endif %}
     </div>
+    {% if is_stale %}
+    <div class="stale-notice">
+        Keine Verbindung zum Kalender – zeige letzten Stand{% if as_of %} vom {{ as_of.strftime("%d.%m.%Y, %H:%M") }} Uhr{% endif %}.
+    </div>
+    {% endif %}
 </body>
 </html>
