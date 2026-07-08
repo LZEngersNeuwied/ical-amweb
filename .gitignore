@@ -219,3 +219,7 @@ __marimo__/
 
 # Kalender-Cache (Laufzeitdaten, siehe config.yaml: cache.file_path)
 /cache/
+
+# macOS
+.DS_Store
+__MACOSX/
